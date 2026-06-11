@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VideoStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model Video {
+  id        String              @id @default(cuid())
+  title     String
+  filename  String
+  duration  Float?
+  status    VideoStatus         @default(PENDING)
+  error     String?
+  createdAt DateTime            @default(now())
+  sections  TranscriptSection[]
+  nodes     TranscriptNode[]
+
+  @@index([createdAt])
+}
+
+model TranscriptNode {
+  id        String           @id @default(cuid())
+  videoId   String
+  video     Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    TranscriptNode?  @relation("TranscriptNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  TranscriptNode[] @relation("TranscriptNodeTree")
+  title     String
+  summary   String           @db.Text
+  text      String           @default("") @db.Text
+  startTime Float
+  endTime   Float
+  depth     Int
+  nodeIndex Int
+  createdAt DateTime         @default(now())
+
+  @@index([videoId])
+  @@index([parentId])
+  @@index([videoId, depth])
+  @@index([videoId, nodeIndex])
+}
+
+model TranscriptSection {
+  id            String                      @id @default(cuid())
+  videoId       String
+  video         Video                       @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  sectionTitle  String
+  startTime     Float
+  endTime       Float
+  transcript    String                      @db.Text
+  pageLikeIndex Int
+  searchVector  Unsupported("tsvector")?
+  createdAt     DateTime                    @default(now())
+
+  @@index([videoId])
+  @@index([pageLikeIndex])
+  @@index([videoId, pageLikeIndex])
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String
+  content   String      @db.Text
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  @@index([sessionId])
+  @@index([createdAt])
+}
